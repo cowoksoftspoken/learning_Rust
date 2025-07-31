@@ -4,31 +4,14 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-# Kerangka kerja web Axum
-axum = { version = "0.7", features = ["macros", "multipart"] } # Tambah fitur "multipart"
-
-# Server HTTP Hyper
+axum = { version = "0.7", features = ["macros", "multipart"] } 
 hyper = { version = "1.0", features = ["full"] }
-
-# Serialisasi/deserialisasi data (digunakan untuk FormulirUnduhan)
 serde = { version = "1.0", features = ["derive"] }
-
-# Untuk membuat dan memparsing JSON
 serde_json = "1.0"
-
-# Runtime asynchronous untuk Rust
-tokio = { version = "1.0", features = ["full"] } # "full" mencakup "macros", "rt-multi-thread"
-
-# Utilitas Tower HTTP (digunakan untuk ServeDir)
-tower-http = { version = "0.5", features = ["fs"] } # "fs" untuk ServeDir
-
-# Pembangkit UUID (digunakan untuk ID unduhan unik)
-uuid = { version = "1.0", features = ["v4", "serde"] } # "v4" untuk UUID versi 4, "serde" untuk serialisasi/deserialisasi
-
-# Makro untuk membuat stream asynchronous dengan mudah
+tokio = { version = "1.0", features = ["full"] } 
+tower-http = { version = "0.5", features = ["fs"] }
+uuid = { version = "1.0", features = ["v4", "serde"] } 
 async-stream = "0.3"
-
-# Untuk menebak tipe MIME berdasarkan ekstensi file
 mime_guess = "2.0"
 tokio-util = "0.7.15"
 
