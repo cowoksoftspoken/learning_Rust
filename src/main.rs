@@ -62,12 +62,6 @@ async fn display_form() -> impl IntoResponse {
     )
 }
 
-// Sementara Gak Dipakai
-#[derive(Deserialize)]
-struct FormDownloader {
-    url: String,
-}
-
 #[derive(Deserialize)]
 struct ParameterProgres {
     id: Uuid, 
@@ -113,7 +107,7 @@ async fn handle_unduhan(
     let id_unduhan_kloning = id_unduhan;
     let saluran_progres_unduhan_kloning = status_aplikasi.saluran_progres_unduhan.clone(); // Clone untuk task
     tokio::spawn(async move {
-        let mut proses_anak = Command::new("yt-dlp")
+        let mut child_proccess = Command::new("yt-dlp")
             .arg("-o")
             .arg(&jalur_keluar_template)
             .arg(&url_unduhan)
@@ -123,7 +117,7 @@ async fn handle_unduhan(
             .spawn()
             .expect("Gagal menjalankan yt-dlp");
 
-        let stderr = proses_anak.stderr.take().unwrap();
+        let stderr = child_proccess.stderr.take().unwrap();
         let mut pembaca_stderr = BufReader::new(stderr).lines();
 
         while let Ok(Some(baris)) = pembaca_stderr.next_line().await {
@@ -132,7 +126,7 @@ async fn handle_unduhan(
             }
         }
 
-        let status_proses = proses_anak.wait().await;
+        let status_proses = child_proccess.wait().await;
 
         let mut nama_asli: Option<String> = None;
         if let Ok(status) = status_proses {
