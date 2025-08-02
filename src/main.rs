@@ -1,28 +1,28 @@
 use axum::{
-    body::{Body}, 
-    extract::{Path, Query, State, Multipart}, 
-    http::{header, StatusCode},
+    Router,
+    body::Body,
+    extract::{Multipart, Path, Query, State},
+    http::{StatusCode, header},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
-    Router,
 };
-use serde::{Deserialize, Serialize}; 
+use mime_guess;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    path::PathBuf, 
+    path::PathBuf,
     sync::{Arc, Mutex},
 };
 use tokio::{
     fs::{self, File},
     io::{AsyncBufReadExt, BufReader},
+    net::TcpListener,
     process::Command,
     sync::broadcast,
-    net::TcpListener, 
 };
 use tower_http::services::ServeDir;
 use uuid::Uuid;
-use mime_guess; 
 
 #[derive(Clone)]
 struct StatusAplikasi {
@@ -41,18 +41,23 @@ async fn main() {
     let app_router = Router::new()
         .route("/", get(display_form))
         .route("/download", post(handle_unduhan))
-        .route("/progress", get(handle_progress)) 
-        .route("/ambil_unduhan/:id_unduhan_str/:nama_file", get(ambil_unduhan)) 
+        .route("/progress", get(handle_progress))
+        .route(
+            "/ambil_unduhan/:id_unduhan_str/:nama_file",
+            get(ambil_unduhan),
+        )
         .with_state(status_aplikasi.clone())
         .nest_service("/static", ServeDir::new("static"))
-        .nest_service("/downloads", ServeDir::new("downloads")); 
+        .nest_service("/downloads", ServeDir::new("downloads"));
 
     let address = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Server berjalan di http://{}", address);
 
     let listener = TcpListener::bind(address).await.unwrap();
-    axum::serve(listener, app_router.into_make_service()).await.unwrap();
-} 
+    axum::serve(listener, app_router.into_make_service())
+        .await
+        .unwrap();
+}
 
 async fn display_form() -> impl IntoResponse {
     Html(
@@ -64,7 +69,7 @@ async fn display_form() -> impl IntoResponse {
 
 #[derive(Deserialize)]
 struct ParameterProgres {
-    id: Uuid, 
+    id: Uuid,
 }
 
 #[derive(Serialize)]
@@ -75,15 +80,17 @@ struct ResponseDownloadStart {
 
 async fn handle_unduhan(
     State(status_aplikasi): State<StatusAplikasi>,
-    mut multipart: Multipart, 
+    mut multipart: Multipart,
 ) -> impl IntoResponse {
     let mut url_unduhan: Option<String> = None;
+    let mut format = "mp4".to_string(); // Default format
 
     while let Some(field) = multipart.next_field().await.unwrap() {
         let name = field.name().unwrap().to_string();
         if name == "url" {
             url_unduhan = Some(field.text().await.unwrap());
-            break; 
+        } else if name == "format" {
+            format = field.text().await.unwrap();
         }
     }
 
@@ -100,28 +107,38 @@ async fn handle_unduhan(
     let (pengirim_saluran, _penerima_saluran) = broadcast::channel::<String>(16); // Buffer size 16
     {
         let mut saluran = status_aplikasi.saluran_progres_unduhan.lock().unwrap();
-        saluran.insert(id_unduhan, pengirim_saluran.clone()); 
+        saluran.insert(id_unduhan, pengirim_saluran.clone());
     }
 
     let pengirim_saluran_kloning = pengirim_saluran.clone();
     let id_unduhan_kloning = id_unduhan;
-    let saluran_progres_unduhan_kloning = status_aplikasi.saluran_progres_unduhan.clone(); // Clone untuk task
+    let saluran_progres_unduhan_kloning = status_aplikasi.saluran_progres_unduhan.clone(); 
     tokio::spawn(async move {
-        let mut child_proccess = Command::new("yt-dlp")
+        let mut child_proccess = Command::new("yt-dlp");
+        child_proccess
             .arg("-o")
             .arg(&jalur_keluar_template)
             .arg(&url_unduhan)
             .arg("--progress-template")
             .arg("download:%(progress._percent_str)s")
-            .stderr(std::process::Stdio::piped())
+            .args(["--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36"]);
+
+        if format == "mp3" {
+            child_proccess.args(["-x", "--audio-format", "mp3"]);
+        } else {
+            child_proccess.arg("-f").arg("mp4");
+        }
+
+        let mut child_proccess = child_proccess
+            .stdout(std::process::Stdio::piped())
             .spawn()
             .expect("Gagal menjalankan yt-dlp");
 
-        let stderr = child_proccess.stderr.take().unwrap();
-        let mut pembaca_stderr = BufReader::new(stderr).lines();
+        let stdout  = child_proccess.stdout.take().unwrap();
+        let mut pembaca_stdout = BufReader::new(stdout).lines();
 
-        while let Ok(Some(baris)) = pembaca_stderr.next_line().await {
-            if baris.contains("download:") {
+        while let Ok(Some(baris)) = pembaca_stdout.next_line().await {
+            if baris.contains("download:") || baris.contains("%") {
                 let _ = pengirim_saluran_kloning.send(baris); // Kirim update progres
             }
         }
@@ -165,9 +182,7 @@ async fn handle_unduhan(
     (StatusCode::OK, axum::Json(respons_data)).into_response()
 }
 
-async fn ambil_unduhan(
-    Path((_id_unduhan, nama_file)): Path<(String, String)>, 
-) -> Response {
+async fn ambil_unduhan(Path((_id_unduhan, nama_file)): Path<(String, String)>) -> Response {
     let jalur_file = PathBuf::from(format!("downloads/{}", nama_file));
 
     if !jalur_file.exists() {
@@ -208,12 +223,14 @@ async fn ambil_unduhan(
 }
 
 async fn handle_progress(
-    State(status_aplikasi): State<StatusAplikasi>, 
-    Query(parameter_kueri): Query<ParameterProgres>, 
+    State(status_aplikasi): State<StatusAplikasi>,
+    Query(parameter_kueri): Query<ParameterProgres>,
 ) -> impl IntoResponse {
     let penerima_saluran = {
         let saluran = status_aplikasi.saluran_progres_unduhan.lock().unwrap();
-        saluran.get(&parameter_kueri.id).map(|pengirim| pengirim.subscribe())
+        saluran
+            .get(&parameter_kueri.id)
+            .map(|pengirim| pengirim.subscribe())
     };
 
     let Some(mut penerima_saluran) = penerima_saluran else {

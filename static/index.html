@@ -31,6 +31,14 @@
     <form id="download-form" class="bg-white p-8 rounded-2xl shadow-xl flex flex-col gap-6 w-full max-w-md">
         <input type="text" id="url" name="url" placeholder="Link YouTube..." required
             class="p-4 border-2 border-gray-300 rounded-xl text-lg focus:border-blue-500 focus:outline-none transition-all duration-300" />
+
+        <!-- 🔽 Dropdown Pilih Format -->
+        <select id="format" name="format"
+            class="p-4 border-2 border-gray-300 rounded-xl text-lg focus:border-blue-500 focus:outline-none transition-all duration-300">
+            <option value="mp4" selected>🎬 MP4 (Video)</option>
+            <option value="mp3">🎵 MP3 (Audio)</option>
+        </select>
+
         <button type="submit"
             class="py-4 px-6 bg-blue-600 text-white font-bold text-xl rounded-xl shadow-lg hover:bg-blue-700 transform hover:scale-105 transition-all duration-300">
             Download
@@ -57,19 +65,22 @@
         const downloadLinkContainer = document.getElementById("download-link-container");
         const downloadLink = document.getElementById("download-link");
 
-        let currentSource = null; 
+        let currentSource = null;
 
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
-            progressText.textContent = "Download dimulai...";
+            progressText.textContent = "🚀 Download dimulai...";
             progressFill.style.width = "0%";
             progressFill.setAttribute("data-percent", "0%");
             downloadLinkContainer.classList.add("hidden");
             downloadLink.href = "#";
 
             const url = document.getElementById("url").value;
+            const format = document.getElementById("format").value;
+
             const formData = new FormData();
             formData.append("url", url);
+            formData.append("format", format);
 
             if (currentSource) {
                 currentSource.close();
@@ -82,7 +93,7 @@
                 });
 
                 if (!response.ok) {
-                    const errorData = await response.json().catch(() => ({})); 
+                    const errorData = await response.json().catch(() => ({}));
                     const errorMsg = errorData.status || "Terjadi kesalahan yang tidak diketahui.";
                     progressText.textContent = `Gagal start download: ${errorMsg}`;
                     return;
@@ -98,12 +109,11 @@
                 currentSource.onmessage = (event) => {
                     const text = event.data;
                     progressText.textContent = `Progress: ${text}`;
-                    // Regex dapet dari AI 
                     const match = text.match(/(\d+\.\d+)%|(\d+)%/);
                     if (match) {
-                        const percent = parseFloat(match[1] || match[2]); 
+                        const percent = parseFloat(match[1] || match[2]);
                         progressFill.style.width = percent + "%";
-                        progressFill.setAttribute("data-percent", `${percent.toFixed(0)}%`); 
+                        progressFill.setAttribute("data-percent", `${percent.toFixed(0)}%`);
                     }
                 };
 
@@ -115,17 +125,17 @@
 
                     downloadLink.href = `/ambil_unduhan/${downloadId}/${filename}`;
                     downloadLink.textContent = `Unduh ${filename}`;
-                    downloadLinkContainer.classList.remove("hidden"); 
+                    downloadLinkContainer.classList.remove("hidden");
 
-                    currentSource.close(); 
+                    currentSource.close();
                 });
 
                 currentSource.addEventListener("error", (event) => {
                     const errorMsg = event.data || "Terjadi kesalahan saat mengunduh.";
-                    progressText.textContent = `❌ Error: ${errorMsg}`;
+                    progressText.textContent = `Error: ${errorMsg}`;
                     progressFill.style.width = "0%";
                     progressFill.setAttribute("data-percent", "0%");
-                    currentSource.close(); 
+                    currentSource.close();
                 });
 
             } catch (error) {
