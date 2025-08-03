@@ -1,14 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" class="dark">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>RustTube</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>RustTube Preview</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
             font-family: 'Inter', sans-serif;
+        }
+
+        .dark body {
+            background: #1A202C;
+            color: #E2E8F0;
         }
 
         #progress-fill::after {
@@ -25,55 +30,70 @@
     </style>
 </head>
 
-<body class="bg-gray-100 flex flex-col items-center justify-center min-h-screen p-4">
-    <h1 class="text-4xl font-extrabold text-blue-800 mb-8 drop-shadow-lg">📥 RustTube</h1>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
 
-    <form id="download-form" class="bg-white p-8 rounded-2xl shadow-xl flex flex-col gap-6 w-full max-w-md">
-        <input type="text" id="url" name="url" placeholder="Link YouTube..." required
-            class="p-4 border-2 border-gray-300 rounded-xl text-lg focus:border-blue-500 focus:outline-none transition-all duration-300" />
+    <div class="bg-gray-800 dark:bg-gray-900 p-8 rounded-2xl w-full max-w-4xl shadow-lg">
+        <h1 class="text-3xl font-bold mb-6 text-gray-100 text-center">📥 RustTube Preview</h1>
 
-        <!-- 🔽 Dropdown Pilih Format -->
-        <select id="format" name="format"
-            class="p-4 border-2 border-gray-300 rounded-xl text-lg focus:border-blue-500 focus:outline-none transition-all duration-300">
-            <option value="mp4" selected>🎬 MP4 (Video)</option>
-            <option value="mp3">🎵 MP3 (Audio)</option>
-        </select>
+        <form id="download-form" class="flex flex-col gap-4">
+            <input id="url" name="url" type="text" placeholder="Link YouTube / Vimeo /…" required
+                class="p-3 bg-gray-700 text-gray-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
 
-        <button type="submit"
-            class="py-4 px-6 bg-blue-600 text-white font-bold text-xl rounded-xl shadow-lg hover:bg-blue-700 transform hover:scale-105 transition-all duration-300">
-            Download
-        </button>
-    </form>
+            <select id="format" name="format" class="p-3 bg-gray-700 text-gray-100 rounded-lg focus:outline-none">
+                <option value="auto" selected>🤖 Otomatis</option>
+                <option value="mp4">🎬 MP4 (Video)</option>
+                <option value="mp3">🎵 MP3 (Audio)</option>
+            </select>
 
-    <div class="progress-container bg-white p-6 rounded-2xl shadow-xl mt-8 w-full max-w-md text-center overflow-hidden">
-        <div id="progress-text" class="text-xl font-semibold text-gray-700 mb-4">⌛ Menunggu...</div>
-        <div id="progress-bar" class="w-full bg-gray-200 rounded-xl h-8 overflow-hidden relative">
-            <div id="progress-fill" class="h-full bg-green-500 rounded-xl transition-all duration-300 flex items-center justify-center text-white font-bold text-lg" data-percent="0%"></div>
+            <button type="submit"
+                class="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition">
+                Download
+            </button>
+        </form>
+
+        <div id="preview-container" class="mt-6 hidden">
+            <h2 class="text-lg font-semibold mb-2">Pratinjau Video:</h2>
+            <video id="preview-video" class="w-full rounded-lg" controls="nodownload"></video>
         </div>
-        <div id="download-link-container" class="mt-6 hidden">
-            <a id="download-link" href="#" target="_blank"
-                class="inline-block py-3 px-6 bg-green-600 text-white font-bold rounded-xl shadow-md hover:bg-green-700 transform hover:scale-105 transition-all duration-300">
-                Download File
-            </a>
+
+        <div id="progress-container" class="mt-6 bg-gray-700 rounded-lg p-4">
+            <div id="progress-text" class="text-md mb-2">⌛ Menunggu...</div>
+            <div class="w-full bg-gray-600 rounded-lg h-4 overflow-hidden relative">
+                <div id="progress-fill" class="h-full bg-green-500 rounded-lg transition-all" data-percent="0%"></div>
+            </div>
+            <div id="download-link-container" class="mt-4 hidden">
+                <a id="download-link" href="#" target="_blank"
+                    class="block py-2 bg-green-600 hover:bg-green-700 text-center rounded-lg font-semibold">
+                    Download File
+                </a>
+                <div id="countdown" class="text-sm mt-2 text-gray-300">Link akan kadaluarsa dalam <span
+                        id="timer">60</span> detik</div>
+            </div>
         </div>
     </div>
-
     <script>
         const form = document.getElementById("download-form");
         const progressText = document.getElementById("progress-text");
         const progressFill = document.getElementById("progress-fill");
         const downloadLinkContainer = document.getElementById("download-link-container");
         const downloadLink = document.getElementById("download-link");
+        const videoPreview = document.getElementById("preview-video");
+        const previewContainer = document.getElementById("preview-container");
 
         let currentSource = null;
+        let retries = 0;
+        const maxRetries = 5;
+        let finished = false;
 
         form.addEventListener("submit", async (e) => {
             e.preventDefault();
-            progressText.textContent = "🚀 Download dimulai...";
+
+            progressText.textContent = "🚀 Mulai download...";
             progressFill.style.width = "0%";
             progressFill.setAttribute("data-percent", "0%");
             downloadLinkContainer.classList.add("hidden");
             downloadLink.href = "#";
+            finished = false;
 
             const url = document.getElementById("url").value;
             const format = document.getElementById("format").value;
@@ -84,6 +104,7 @@
 
             if (currentSource) {
                 currentSource.close();
+                currentSource = null;
             }
 
             try {
@@ -94,60 +115,103 @@
 
                 if (!response.ok) {
                     const errorData = await response.json().catch(() => ({}));
-                    const errorMsg = errorData.status || "Terjadi kesalahan yang tidak diketahui.";
-                    progressText.textContent = `Gagal start download: ${errorMsg}`;
+                    const errorMsg = errorData.status || "Terjadi kesalahan tidak diketahui.";
+                    progressText.textContent = `❌ Gagal mulai: ${errorMsg}`;
                     return;
                 }
 
-                const responseData = await response.json();
-                const downloadId = responseData.id;
+                const data = await response.json();
+                const downloadId = data.id;
+                retries = 0;
 
-                progressText.textContent = `Memulai progres untuk ID: ${downloadId}...`;
-
-                currentSource = new EventSource(`/progress?id=${downloadId}`);
-
-                currentSource.onmessage = (event) => {
-                    const text = event.data;
-                    progressText.textContent = `Progress: ${text}`;
-                    const match = text.match(/(\d+\.\d+)%|(\d+)%/);
-                    if (match) {
-                        const percent = parseFloat(match[1] || match[2]);
-                        progressFill.style.width = percent + "%";
-                        progressFill.setAttribute("data-percent", `${percent.toFixed(0)}%`);
-                    }
-                };
-
-                currentSource.addEventListener("complete", (event) => {
-                    const filename = event.data;
-                    progressText.textContent = `Download selesai: ${filename}`;
-                    progressFill.style.width = "100%";
-                    progressFill.setAttribute("data-percent", "100%");
-
-                    downloadLink.href = `/ambil_unduhan/${downloadId}/${filename}`;
-                    downloadLink.textContent = `Unduh ${filename}`;
-                    downloadLinkContainer.classList.remove("hidden");
-
-                    currentSource.close();
-                });
-
-                currentSource.addEventListener("error", (event) => {
-                    const errorMsg = event.data || "Terjadi kesalahan saat mengunduh.";
-                    progressText.textContent = `Error: ${errorMsg}`;
-                    progressFill.style.width = "0%";
-                    progressFill.setAttribute("data-percent", "0%");
-                    currentSource.close();
-                });
-
+                connectEventSource(downloadId);
             } catch (error) {
-                progressText.textContent = `Ada Mistake Jaringan: ${error.message}`;
-                progressFill.style.width = "0%";
-                progressFill.setAttribute("data-percent", "0%");
-                if (currentSource) {
-                    currentSource.close();
-                }
+                console.error("[JS] Jaringan error:", error);
+                progressText.textContent = `❌ Jaringan error: ${error.message}`;
             }
         });
+
+        function connectEventSource(downloadId) {
+            if (currentSource) {
+                currentSource.close();
+            }
+
+            currentSource = new EventSource(`/progress?id=${downloadId}`);
+            console.log(`[JS] Opening EventSource untuk ID: ${downloadId}`);
+
+            // Tangkap progress biasa
+            currentSource.onmessage = (event) => {
+                const msg = event.data.trim();
+                console.log("[JS] onmessage:", msg);
+
+                if (msg.startsWith("ERROR:")) {
+                    finished = true;
+                    currentSource.close();
+                    progressText.textContent = `❌ ${msg.replace("ERROR:", "")}`;
+                    return;
+                }
+
+                if (msg.startsWith("INFO:")) {
+                    progressText.textContent = `🔧 ${msg.replace("INFO:", "")}`;
+                    return;
+                }
+
+                const match = msg.match(/(\d+\.\d+)%|(\d+)%/);
+                if (match) {
+                    const percent = parseFloat(match[1] || match[2]);
+                    progressFill.style.width = `${percent}%`;
+                    progressFill.setAttribute("data-percent", `${percent.toFixed(0)}%`);
+                    progressText.textContent = `⏳ Downloading... ${percent.toFixed(1)}%`;
+                }
+            };
+
+            currentSource.addEventListener("complete", (event) => {
+                finished = true;
+                currentSource.close();
+
+                const filename = event.data.trim();
+                progressText.textContent = `Selesai: ${filename}`;
+                progressFill.style.width = "100%";
+                progressFill.setAttribute("data-percent", "100%");
+
+                downloadLink.href = `/ambil_unduhan/${downloadId}/${filename}`;
+                downloadLink.textContent = `Unduh ${filename} (60s)`;
+                downloadLinkContainer.classList.remove("hidden");
+
+                let remaining = 60;
+                const timer = setInterval(() => {
+                    remaining--;
+                    downloadLink.textContent = `Unduh ${filename} (${remaining}s)`;
+                    if (remaining <= 0) {
+                        clearInterval(timer);
+                        downloadLink.href = "#";
+                        downloadLink.textContent = `⛔ Link Expired`;
+                        downloadLink.classList.add("opacity-50", "cursor-not-allowed");
+                        downloadLink.classList.remove("hover:bg-green-700");
+                        progressText.textContent = "⚠️ Link download sudah kedaluwarsa. Silakan ulangi.";
+                    }
+                }, 1000);
+            });
+
+            currentSource.onerror = () => {
+                if (finished) {
+                    console.log("[JS] EventSource error tapi udah selesai. Stop reconnect.");
+                    return;
+                }
+
+                currentSource.close();
+
+                if (retries < maxRetries) {
+                    retries++;
+                    progressText.textContent = `⚠️ Koneksi terputus... mencoba ulang (${retries}/${maxRetries})`;
+                    setTimeout(() => connectEventSource(downloadId), 2000);
+                } else {
+                    progressText.textContent = "Gagal menyambung ulang ke server.";
+                }
+            };
+        }
     </script>
+
 </body>
 
 </html>
