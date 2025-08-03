@@ -2,7 +2,7 @@
 
 ![Tampilan Aplikasi](https://i.ibb.co/d0dwvMTh/Screenshot-20250803-170903-Chrome.jpg)
 
-Ini adalah salah satu studi kasus project yang saya kerjakan selama belajar bahasa pemrograman **Rust**. Tujuan dari project ini adalah membangun aplikasi CLI sederhana untuk download video dari YouTube menggunakan kombinasi dari beberapa tools.
+Ini adalah salah satu studi kasus project yang saya kerjakan selama belajar bahasa pemrograman **Rust**. Tujuan dari project ini adalah membangun aplikasi Website Downloader sederhana untuk download video dari YouTube menggunakan kombinasi dari beberapa tools.
 
 ## 🛠️ Tools & Dependency
 
