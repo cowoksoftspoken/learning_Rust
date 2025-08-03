@@ -1,4 +1,4 @@
-# 🎯 Studi Kasus Rust: YouTube Downloader CLI
+# 🎯 Studi Kasus Rust: YouTube Downloader
 
 ![Tampilan Aplikasi](https://i.ibb.co/d0dwvMTh/Screenshot-20250803-170903-Chrome.jpg)
 
