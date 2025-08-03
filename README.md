@@ -18,6 +18,6 @@ Untuk menjalankan project ini, pastikan kamu sudah install:
 ## 🚀 Cara Clone & Jalankan
 
 ```bash
-git clone https://github.com/cowoksoftspoken/Learning_Rust.git
-cd Learning_Rust
+git clone https://github.com/cowoksoftspoken/learning_Rust.git
+cd learning_Rust
 cargo run
