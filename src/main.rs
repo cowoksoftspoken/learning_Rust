@@ -57,6 +57,35 @@ async fn main() {
     axum::serve(listener, app_router.into_make_service())
         .await
         .unwrap();
+    
+    tokio::spawn(async {
+        loop {
+            let entries = match fs::read_dir("downloads").await {
+                Ok(e) => e,
+                Err(_) => {
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    continue;
+                }
+            };
+            tokio::pin!(entries);
+
+            while let Some(entry) = entries.next_entry().await.unwrap_or(None) {
+                let metadata = match entry.metadata().await {
+                    Ok(m) => m,
+                    Err(_) => continue,
+                };
+                if let Ok(modified) = metadata.modified() {
+                    if let Ok(elapsed) = modified.elapsed() {
+                        if elapsed.as_secs() > 600 {
+                            let _ = fs::remove_file(entry.path()).await;
+                        }
+                    }
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        }
+    });
+
 }
 
 async fn display_form() -> impl IntoResponse {
@@ -220,7 +249,7 @@ async fn handle_unduhan(
         if let Some(fname) = nama_file {
             match pengirim.send(format!("COMPLETE:{}", fname)) {
                 Ok(_) => println!("[Rust] Event COMPLETE terkirim: {}", fname),
-                Err(e) => println!("[Rust] ⚠️ Gagal kirim COMPLETE: {}", e),
+                Err(e) => println!("[Rust] Gagal kirim COMPLETE: {}", e),
             }
             println!("[Rust] Unduhan selesai: {}", fname);
         } else {
@@ -261,7 +290,7 @@ async fn ambil_unduhan(Path((_id_unduhan, nama_file)): Path<(String, String)>) -
 
         let salinan_jalur_file = jalur_file.clone();
         tokio::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(600)).await;
             let _ = fs::remove_file(salinan_jalur_file).await;
         });
 
