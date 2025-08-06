@@ -19,5 +19,11 @@ Untuk menjalankan project ini, pastikan kamu sudah install:
 
 ```bash
 git clone https://github.com/cowoksoftspoken/learning_Rust.git
+```
+---
+
+## ✏ Cara Edit 
+```Rust
+.nest_service("static, serve_dir())
 cd learning_Rust
 cargo run
