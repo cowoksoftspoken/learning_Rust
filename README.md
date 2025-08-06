@@ -1,6 +1,6 @@
 # 🎯 Studi Kasus Rust: YouTube Downloader
 
-![Tampilan Aplikasi](https://i.ibb.co/d0dwvMTh/Screenshot-20250803-170903-Chrome.jpg)
+![Tampilan Aplikasi](https://i.ibb.co/67b2Ndgs/Screenshot-20250804-124840-Chrome.jpg)
 
 Ini adalah salah satu studi kasus project yang saya kerjakan selama belajar bahasa pemrograman **Rust**. Tujuan dari project ini adalah membangun aplikasi Website Downloader sederhana untuk download video dari YouTube menggunakan kombinasi dari beberapa tools.
 
