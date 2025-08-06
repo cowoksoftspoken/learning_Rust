@@ -39,5 +39,5 @@ cargo run
         .nest_service("/static", ServeDir::new("static"))
         .nest_service("/downloads", ServeDir::new("downloads"));
 ```
-Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecuali sudah dikustom & menjalankan project ini berarti kamu sudah paham *Rust* Sedikit
+Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecuali sudah dikustom & menjalankan project ini berarti kamu sudah paham **Rust** Sedikit
 
