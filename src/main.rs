@@ -43,8 +43,8 @@ async fn main() {
         .route("/download", post(handle_unduhan))
         .route("/progress", get(handle_progress))
         .route(
-            "/ambil_unduhan/:id_unduhan_str/:nama_file",
-            get(ambil_unduhan),
+            "/ambil_download/:id_unduhan_str/:nama_file",
+            get(ambil_download),
         )
         .with_state(status_aplikasi.clone())
         .nest_service("/static", ServeDir::new("static"))
@@ -274,7 +274,7 @@ async fn handle_unduhan(
     (StatusCode::OK, axum::Json(respons_data)).into_response()
 }
 
-async fn ambil_unduhan(Path((_id_unduhan, nama_file)): Path<(String, String)>) -> Response {
+async fn ambil_download(Path((_id_unduhan, nama_file)): Path<(String, String)>) -> Response {
     let jalur_file = PathBuf::from(format!("downloads/{}", nama_file));
 
     if !jalur_file.exists() {
