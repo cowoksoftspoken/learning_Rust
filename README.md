@@ -22,9 +22,6 @@ git clone https://github.com/cowoksoftspoken/learning_Rust.git
 cd learning_Rust
 cargo run
 ```
-```note
-Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecuali sudah dikustom
-```
 ---
 
 ## ✏ Cara Edit & Kustomisasi
@@ -41,4 +38,7 @@ Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecu
          // Jika kamu ingin mengubah apapund di folder static maka kamu juga perlu mengubah bagian ini
         .nest_service("/static", ServeDir::new("static"))
         .nest_service("/downloads", ServeDir::new("downloads"));
+```
+```note
+Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecuali sudah dikustom
 ```
