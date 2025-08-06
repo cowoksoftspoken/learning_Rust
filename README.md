@@ -35,10 +35,10 @@ cargo run
             get(ambil_download),
         )
         .with_state(status_aplikasi.clone())
-         // Jika kamu ingin mengubah apapund di folder static maka kamu juga perlu mengubah bagian ini
+         // Jika kamu ingin mengubah apapun di folder static maka kamu juga perlu mengubah bagian ini
         .nest_service("/static", ServeDir::new("static"))
         .nest_service("/downloads", ServeDir::new("downloads"));
 ```
 ```note
-Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecuali sudah dikustom
+Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecuali sudah dikustom & menjalankan project ini berarti kamu sudah paham *Rust* Sedikit
 ```
