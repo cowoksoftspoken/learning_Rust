@@ -22,7 +22,9 @@ git clone https://github.com/cowoksoftspoken/learning_Rust.git
 cd learning_Rust
 cargo run
 ```
-
+```note
+Semua hal yang ditampilkan kedalam browser harus berada dalam folder static kecuali sudah dikustom
+```
 ---
 
 ## ✏ Cara Edit & Kustomisasi
