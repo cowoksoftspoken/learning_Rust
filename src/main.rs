@@ -1,13 +1,18 @@
+use axum::async_trait;
+use axum::extract::FromRequestParts;
+use axum::http::request::Parts;
 use axum::{
     Router,
     body::Body,
-    extract::{Multipart, Path, Query, State},
+    extract::{FromRef, Multipart, Path, Query, State},
     http::{StatusCode, header},
     response::{Html, IntoResponse, Response},
     routing::{get, post},
 };
+use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use mime_guess;
 use serde::{Deserialize, Serialize};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -22,11 +27,98 @@ use tokio::{
     sync::broadcast,
 };
 use tower_http::services::ServeDir;
+use url::Url;
 use uuid::Uuid;
+
+const JWT_SECRET: &[u8] = b"K3lAm1n_kUd3!!";
+const REFRESH_SECRET: &[u8] = b"r3Fr3sh_b4N9";
+
+#[derive(Clone, FromRef)]
+struct AppState {
+    saluran_progress_unduhan: Arc<Mutex<HashMap<Uuid, broadcast::Sender<String>>>>,
+}
 
 #[derive(Clone)]
 struct StatusAplikasi {
     saluran_progres_unduhan: Arc<Mutex<HashMap<Uuid, broadcast::Sender<String>>>>,
+}
+
+#[derive(Deserialize, Debug, Serialize)]
+struct Claims {
+    sub: String,
+    exp: usize,
+}
+
+#[derive(Debug)]
+pub struct Auth {
+    pub user_id: String,
+}
+
+#[derive(Serialize)]
+struct TokenPair {
+    access_token: String,
+    refresh_token: String,
+}
+
+#[derive(Deserialize)]
+struct ParameterProgres {
+    id: Uuid,
+}
+
+#[derive(Deserialize)]
+struct LoginPayload {
+    username: String,
+}
+
+#[derive(Serialize)]
+struct ResponseDownloadStart {
+    id: String,
+    status: String,
+}
+
+#[derive(Serialize)]
+struct TokenResponse {
+    token: String,
+}
+
+#[derive(Deserialize)]
+struct RefreshRequest {
+    refresh_token: String,
+}
+
+#[async_trait]
+impl<S> FromRequestParts<S> for Auth
+where
+    S: Send + Sync,
+{
+    type Rejection = (StatusCode, String);
+
+    async fn from_request_parts(parts: &mut Parts, _state: &S) -> Result<Self, Self::Rejection> {
+        let auth_header = parts
+            .headers
+            .get("Authorization")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("");
+
+        if !auth_header.starts_with("Bearer ") {
+            return Err((
+                StatusCode::UNAUTHORIZED,
+                "Missing or invalid Authorization header".into(),
+            ));
+        }
+
+        let token = &auth_header[7..];
+
+        let decoding_key = DecodingKey::from_secret(JWT_SECRET);
+        let validation = Validation::default();
+
+        let token_data = decode::<Claims>(token, &decoding_key, &validation)
+            .map_err(|_| (StatusCode::UNAUTHORIZED, "Invalid token".into()))?;
+
+        Ok(Auth {
+            user_id: token_data.claims.sub,
+        })
+    }
 }
 
 #[tokio::main]
@@ -38,8 +130,14 @@ async fn main() {
         saluran_progres_unduhan: Arc::new(Mutex::new(HashMap::new())),
     };
 
+    let app_state = AppState {
+        saluran_progress_unduhan: status_aplikasi.saluran_progres_unduhan.clone(),
+    };
+
     let app_router = Router::new()
         .route("/", get(display_form))
+        .route("/auth/login", post(login))
+        .route("/auth/refresh", post(refresh))
         .route("/download", post(handle_unduhan))
         .route("/progress", get(handle_progress))
         .route(
@@ -48,7 +146,8 @@ async fn main() {
         )
         .with_state(status_aplikasi.clone())
         .nest_service("/static", ServeDir::new("static"))
-        .nest_service("/downloads", ServeDir::new("downloads"));
+        .nest_service("/downloads", ServeDir::new("downloads"))
+        .with_state(app_state.clone());
 
     let address = SocketAddr::from(([127, 0, 0, 1], 3000));
     println!("Server berjalan di http://{}", address);
@@ -57,7 +156,7 @@ async fn main() {
     axum::serve(listener, app_router.into_make_service())
         .await
         .unwrap();
-    
+
     tokio::spawn(async {
         loop {
             let entries = match fs::read_dir("downloads").await {
@@ -85,7 +184,6 @@ async fn main() {
             tokio::time::sleep(std::time::Duration::from_secs(60)).await;
         }
     });
-
 }
 
 async fn display_form() -> impl IntoResponse {
@@ -96,19 +194,88 @@ async fn display_form() -> impl IntoResponse {
     )
 }
 
-#[derive(Deserialize)]
-struct ParameterProgres {
-    id: Uuid,
+async fn refresh(axum::Json(payload): axum::Json<RefreshRequest>) -> impl IntoResponse {
+    let decoding_key = DecodingKey::from_secret(REFRESH_SECRET);
+    let validation = Validation::default();
+    let token_data = match decode::<Claims>(&payload.refresh_token, &decoding_key, &validation) {
+        Ok(data) => data,
+        Err(_) => {
+            return (StatusCode::UNAUTHORIZED, "Invalid or expire refresh_token").into_response();
+        }
+    };
+
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    let access_expire = now + (60 * 60);
+    let new_access = Claims {
+        sub: token_data.claims.sub,
+        exp: access_expire as usize,
+    };
+
+    let new_access_token = encode(
+        &Header::default(),
+        &new_access,
+        &EncodingKey::from_secret(JWT_SECRET),
+    )
+    .unwrap();
+
+    (
+        StatusCode::OK,
+        axum::Json(TokenResponse {
+            token: new_access_token,
+        }),
+    )
+        .into_response()
 }
 
-#[derive(Serialize)]
-struct ResponseDownloadStart {
-    id: String,
-    status: String,
+async fn login(axum::Json(payload): axum::Json<LoginPayload>) -> impl IntoResponse {
+    let exp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+
+    let access_expire = exp + (60 + 60);
+    let refresh_expire = exp + (60 * 60 * 24 * 7);
+
+    let access_claims = Claims {
+        sub: payload.username.clone(),
+        exp: access_expire as usize,
+    };
+
+    let refresh_claims = Claims {
+        sub: payload.username,
+        exp: refresh_expire as usize,
+    };
+
+    let access_token = encode(
+        &Header::default(),
+        &access_claims,
+        &EncodingKey::from_secret(JWT_SECRET),
+    )
+    .unwrap();
+
+    let refresh_token = encode(
+        &Header::default(),
+        &refresh_claims,
+        &EncodingKey::from_secret(REFRESH_SECRET),
+    )
+    .unwrap();
+
+    (
+        StatusCode::OK,
+        axum::Json(TokenPair {
+            access_token,
+            refresh_token,
+        }),
+    )
+        .into_response()
 }
 
 async fn handle_unduhan(
     State(status_aplikasi): State<StatusAplikasi>,
+    _auth: Auth,
     mut multipart: Multipart,
 ) -> impl IntoResponse {
     let mut url_unduhan: Option<String> = None;
@@ -123,11 +290,21 @@ async fn handle_unduhan(
     }
 
     let url_unduhan = match url_unduhan {
-        Some(url) => url,
+        Some(url) => {
+            if Url::parse(&url).is_err() {
+                return (StatusCode::BAD_REQUEST, "URL tidak valid.").into_response();
+            }
+            url
+        }
         None => {
             return (StatusCode::BAD_REQUEST, "URL tidak ditemukan.").into_response();
         }
     };
+
+    const ALLOWED_FORMAT: [&'static str; 3] = ["auto", "mp4", "mp3"];
+    if !ALLOWED_FORMAT.contains(&format.as_str()) {
+        return (StatusCode::BAD_REQUEST, "Format tidak valid.").into_response();
+    }
 
     let id_unduhan = Uuid::new_v4();
     let jalur_keluar_template = format!("downloads/{}.%(ext)s", id_unduhan);
@@ -158,7 +335,8 @@ async fn handle_unduhan(
             }
             "mp4" => {
                 cmd.arg("-f")
-                    .arg("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best");
+                    .arg("bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best")
+                    .args(["--merge-output-format", "mp4"]);
                 println!("[yt-dlp] Format MP4 dipilih");
             }
             _ => {
@@ -274,7 +452,10 @@ async fn handle_unduhan(
     (StatusCode::OK, axum::Json(respons_data)).into_response()
 }
 
-async fn ambil_download(Path((_id_unduhan, nama_file)): Path<(String, String)>) -> Response {
+async fn ambil_download(
+    Path((_id_unduhan, nama_file)): Path<(String, String)>,
+    _auth: Auth,
+) -> Response {
     let jalur_file = PathBuf::from(format!("downloads/{}", nama_file));
 
     if !jalur_file.exists() {
