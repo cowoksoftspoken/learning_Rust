@@ -4,6 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RustTube</title>
+    <link rel="preload" as="image" href="/static/logo/RustTube_logo.png" />
+    <link rel="preload" as="image" href="/static/background/sea.avif" />
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       body {
@@ -26,16 +28,30 @@
         font-weight: bold;
         font-size: 0.9em;
       }
+      .hero-bg {
+        min-height: 100vh;
+        background-image: url("/static/background/under_sea.avif") !important;
+      }
+      .hero-bg {
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+      }
     </style>
+    <link rel="shortcut icon" href="/static/logo/RustTube_logo.png" />
   </head>
 
-  <body class="min-h-screen flex flex-col items-center justify-center p-4">
+  <body
+    class="min-h-screen flex flex-col items-center justify-center p-4 hero-bg text-gray-100"
+  >
     <div
-      class="bg-gray-800 dark:bg-gray-900 p-8 rounded-2xl w-full max-w-2xl shadow-lg"
+      class="relative bg-white/10 dark:bg-gray-900/40 backdrop-blur-xl p-8 rounded-3xl w-full max-w-xl shadow-2xl border border-white/20"
     >
-      <h1 class="text-3xl font-bold mb-6 text-gray-100 text-center">
-        📥 RustTube Preview
-      </h1>
+      <img
+        src="/static/logo/RustTube_logo.png"
+        alt="RustTube Logo"
+        class="w-[65%] mx-auto mb-8 drop-shadow-lg"
+      />
 
       <!-- Form Login -->
       <form id="login-form" class="flex flex-col gap-4 mb-6">
@@ -43,63 +59,77 @@
           id="username"
           type="text"
           placeholder="Username"
-          class="p-3 bg-gray-700 text-gray-100 rounded-lg"
+          class="p-3 bg-white/10 border border-white/20 text-gray-100 placeholder-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 transition"
           required
         />
         <button
           type="submit"
-          class="py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition"
+          class="py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all"
         >
           Login & Dapatkan Token
         </button>
       </form>
 
-      <form id="download-form" class="flex flex-col gap-4 hidden">
+      <form id="download-form" class="flex flex-col gap-4 mb-6 hidden">
         <input
           id="url"
           type="text"
           placeholder="Link YouTube / Tiktok / ..."
           required
-          class="p-3 bg-gray-700 text-gray-100 rounded-lg"
+          class="p-3 bg-white/10 border border-white/20 text-gray-100 placeholder-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
         />
-        <select id="format" class="p-3 bg-gray-700 text-gray-100 rounded-lg">
+        <select
+          id="format"
+          class="p-3 bg-gray-900 border border-white/20 text-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+        >
           <option value="auto" selected>🤖 Otomatis</option>
           <option value="mp4">🎬 MP4 (Video)</option>
           <option value="mp3">🎵 MP3 (Audio)</option>
         </select>
         <button
           type="submit"
-          class="py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
+          class="py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all"
         >
           Download
         </button>
       </form>
 
       <div id="preview-container" class="mt-6 hidden">
-        <h2 class="text-lg font-semibold mb-2">Pratinjau Video:</h2>
-        <video id="preview-video" class="w-full rounded-lg" controls></video>
+        <h2 class="text-lg font-semibold mb-3 text-white/90">
+          📺 Pratinjau Video:
+        </h2>
+        <video
+          id="preview-video"
+          class="w-full rounded-xl border border-white/20 shadow-lg"
+          controls
+        ></video>
       </div>
 
       <div
         id="progress-container"
-        class="mt-6 bg-gray-700 rounded-lg p-4 hidden"
+        class="mt-6 bg-white/5 border border-white/20 rounded-xl p-5 hidden"
       >
-        <div id="progress-text" class="text-md mb-2">⌛ Menunggu...</div>
-        <div class="w-full bg-gray-600 rounded-lg h-4 overflow-hidden relative">
+        <div
+          id="progress-text"
+          class="text-md mb-3 text-gray-200 flex items-center gap-2"
+        >
+          ⌛ Menunggu...
+        </div>
+        <div class="w-full bg-white/10 rounded-lg h-4 overflow-hidden relative">
           <div
             id="progress-fill"
-            class="h-full bg-green-500 rounded-lg transition-all"
+            class="h-full bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg transition-all"
             data-percent="0%"
           ></div>
         </div>
-        <div id="download-link-container" class="mt-4 hidden">
+        <div id="download-link-container" class="mt-5 hidden">
           <a
             id="download-link"
             href="#"
             target="_blank"
-            class="block py-2 bg-green-600 hover:bg-green-700 text-center rounded-lg font-semibold"
+            class="block py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-center rounded-xl font-semibold shadow-md hover:shadow-lg transition"
           >
-            Download File
+            ⬇ Download File
           </a>
         </div>
       </div>
@@ -158,6 +188,7 @@
 
         const data = await res.json();
         localStorage.setItem("jwt_access", data.token);
+        console.log("[JS] Token akses diperbarui:", data.token);
         return data.token;
       }
 
@@ -313,7 +344,7 @@
               downloadLink.classList.remove("hover:bg-green-700");
               progressText.textContent =
                 "Link download sudah kedaluwarsa. Silakan ulangi.";
-              console.log("[Warn] Link expired, tidak bisa diunduh lagi.");
+              console.warn("[Warn] Link expired, tidak bisa diunduh lagi.");
             }
           }, 1000);
         });
