@@ -157,8 +157,8 @@
         }
 
         const data = await res.json();
-        localStorage.setItem("jwt_access", data.access_token);
-        return data.access_token;
+        localStorage.setItem("jwt_access", data.token);
+        return data.token;
       }
 
       async function authFetch(url, options = {}) {
