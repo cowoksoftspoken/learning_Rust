@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="https://github.com/cowoksoftspoken/learning_Rust/blob/main/static/logo/RustTube_logo.png?raw=true" width="500"/>
-</p>
-
 # 🎯 Studi Kasus Rust: YouTube Downloader
 
 ![Tampilan Aplikasi](https://camo.githubusercontent.com/2f06cb07c4eb1f22fa68bce73f2a53708000d276e755ac471595b8e555320165/68747470733a2f2f692e6962622e636f2f363762324e6467732f53637265656e73686f742d32303235303830342d3132343834302d4368726f6d652e6a7067)
