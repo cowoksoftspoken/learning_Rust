@@ -1,4 +1,6 @@
-![Logo Aplikasi](https://github.com/cowoksoftspoken/learning_Rust/blob/main/static/logo/RustTube_logo.png?raw=true)
+<p align="center">
+  <img src="https://github.com/cowoksoftspoken/learning_Rust/blob/main/static/logo/RustTube_logo.png?raw=true" width="150"/>
+</p>
 
 # 🎯 Studi Kasus Rust: YouTube Downloader
 
