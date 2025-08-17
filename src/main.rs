@@ -367,6 +367,21 @@ async fn handle_unduhan(
                     match out {
                         Ok(Some(line)) => {
                             println!("[stdout] {}", line);
+                            if line.contains("Downloading webpage") {
+                                let _ = pengirim.send("INFO: Proses pengunduhan halaman dimulai.".to_string());
+                                println!("[Rust] Detected Downloading Webpage Line");
+                            }
+
+                            if line.contains("Extracting") {
+                                let _ = pengirim.send("INFO: Proses ekstraksi dimulai.".to_string());
+                                println!("[Rust] Detected Extracting Line");
+                            }
+
+                            if line.contains("Extracting audio") {
+                                let _ = pengirim.send("INFO: Proses ekstraksi audio dimulai.".to_string());
+                                println!("[Rust] Detected Extracting Audio Line");
+                            }
+
                             if line.contains("download:") || line.contains('%') {
                                 let _ = pengirim.send(line.clone());
                             }
