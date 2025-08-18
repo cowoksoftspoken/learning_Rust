@@ -18,8 +18,8 @@ Untuk menjalankan project ini, pastikan kamu sudah install:
 ## 🚀 Cara Clone & Jalankan
 
 ```bash
-git clone https://github.com/cowoksoftspoken/learning_Rust.git
-cd learning_Rust
+git clone https://github.com/cowoksoftspoken/RusTube.git
+cd RusTube
 cargo run
 ```
 ---
