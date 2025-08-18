@@ -93,6 +93,14 @@
           Download
         </button>
       </form>
+      <div class="mt-2 w-full flex">
+        <button
+          class="w-full py-3 bg-gradient-to-r from-pink-600 to-red-600 hover:from-red-700 hover:to-pink-700 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all"
+          id="cancel-button"
+        >
+          Cancel
+        </button>
+      </div>
 
       <div id="preview-container" class="mt-6 hidden">
         <h2 class="text-lg font-semibold mb-3 text-white/90">
@@ -146,11 +154,13 @@
       const videoPreview = document.getElementById("preview-video");
       const previewContainer = document.getElementById("preview-container");
       const progressContainer = document.getElementById("progress-container");
+      const cancelButton = document.getElementById("cancel-button");
 
       let currentSource = null;
       let retries = 0;
       const maxRetries = 5;
       let finished = false;
+      let currentDownloadId = null;
       let token = localStorage.getItem("jwt_access") || "";
 
       function formatDuration(duration) {
@@ -187,9 +197,9 @@
         }
 
         const data = await res.json();
-        localStorage.setItem("jwt_access", data.token);
-        console.log("[JS] Token akses diperbarui:", data.token);
-        return data.token;
+        localStorage.setItem("jwt_access", data.access_token);
+        console.log("[JS] Token akses diperbarui:", data.access_token);
+        return data.access_token;
       }
 
       async function authFetch(url, options = {}) {
@@ -237,6 +247,12 @@
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
+        // cek jika ada unduhan yang sedang berjalan
+        if (currentSource && !finished) {
+          alert("Masih ada unduhan yang sedang berjalan. Silakan tunggu.");
+          return;
+        }
+
         progressContainer.classList.remove("hidden");
         progressText.textContent = "🚀 Mulai download...";
         progressFill.style.width = "0%";
@@ -274,11 +290,36 @@
           const data = await response.json();
           const downloadId = data.id;
           retries = 0;
+          currentDownloadId = downloadId;
+          console.log("[JS] ID Unduhan:", downloadId);
 
           connectEventSource(downloadId);
         } catch (error) {
           console.error("[JS] Jaringan error:", error);
           progressText.textContent = `Jaringan error: ${error.message}`;
+        }
+      });
+
+      cancelButton.addEventListener("click", async () => {
+        if (!currentDownloadId) {
+          alert("Tidak ada unduhan yang sedang berjalan.");
+          return;
+        }
+
+        try {
+          await cancel_download(currentDownloadId);
+          if (currentSource) {
+            currentSource.close();
+            currentSource = null;
+          }
+          progressText.textContent = "Pembatalan unduhan berhasil.";
+          progressFill.style.width = "0%";
+          progressFill.setAttribute("data-percent", "0%");
+          downloadLinkContainer.classList.add("hidden");
+          previewContainer.classList.add("hidden");
+        } catch (error) {
+          console.error("[JS] Gagal membatalkan unduhan:", error);
+          alert(`Gagal membatalkan unduhan: ${error.message}`);
         }
       });
 
@@ -367,6 +408,25 @@
             progressText.textContent = "Gagal menyambung ulang ke server.";
           }
         };
+      }
+
+      async function cancel_download(downloadId) {
+        const response = await authFetch(`/cancel_download?id=${downloadId}`, {
+          method: "POST",
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMsg =
+            errorData.status || "Terjadi kesalahan tidak diketahui.";
+          alert(`Gagal membatalkan unduhan: ${errorMsg}`);
+          return;
+        }
+
+        console.log(
+          "[JS] Pembatalan unduhan berhasil." + (downloadId, response.text())
+        );
+        progressText.textContent = "Pembatalan unduhan berhasil.";
       }
 
       async function setDownloadLink(downloadId, filename) {

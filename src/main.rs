@@ -41,6 +41,7 @@ struct AppState {
 #[derive(Clone)]
 struct StatusAplikasi {
     saluran_progres_unduhan: Arc<Mutex<HashMap<Uuid, broadcast::Sender<String>>>>,
+    pembatalan: Arc<Mutex<HashMap<Uuid, tokio::sync::oneshot::Sender<()>>>>,
 }
 
 #[derive(Deserialize, Debug, Serialize)]
@@ -78,7 +79,7 @@ struct ResponseDownloadStart {
 
 #[derive(Serialize)]
 struct TokenResponse {
-    token: String,
+    access_token: String,
 }
 
 #[derive(Deserialize)]
@@ -128,6 +129,7 @@ async fn main() {
 
     let status_aplikasi = StatusAplikasi {
         saluran_progres_unduhan: Arc::new(Mutex::new(HashMap::new())),
+        pembatalan: Arc::new(Mutex::new(HashMap::new())),
     };
 
     let app_state = AppState {
@@ -140,6 +142,7 @@ async fn main() {
         .route("/auth/refresh", post(refresh))
         .route("/download", post(handle_unduhan))
         .route("/progress", get(handle_progress))
+        .route("/cancel_download", post(cancel_download))
         .route(
             "/ambil_download/:id_unduhan_str/:nama_file",
             get(ambil_download),
@@ -224,7 +227,7 @@ async fn refresh(axum::Json(payload): axum::Json<RefreshRequest>) -> impl IntoRe
     (
         StatusCode::OK,
         axum::Json(TokenResponse {
-            token: new_access_token,
+            access_token: new_access_token,
         }),
     )
         .into_response()
@@ -315,6 +318,11 @@ async fn handle_unduhan(
         map.insert(id_unduhan, pengirim.clone());
     }
 
+    let (cancel_tx, mut cancel_rx) = tokio::sync::oneshot::channel();
+    {
+        let mut map = status_aplikasi.pembatalan.lock().unwrap();
+        map.insert(id_unduhan, cancel_tx);
+    }
     let id_clone = id_unduhan;
     let saluran_clone = status_aplikasi.saluran_progres_unduhan.clone();
     tokio::spawn(async move {
@@ -360,60 +368,72 @@ async fn handle_unduhan(
         let stderr = child.stderr.take().unwrap();
         let mut reader_out = BufReader::new(stdout).lines();
         let mut reader_err = BufReader::new(stderr).lines();
-
-        loop {
-            tokio::select! {
-                out = reader_out.next_line() => {
-                    match out {
-                        Ok(Some(line)) => {
-                            println!("[stdout] {}", line);
-                            if line.contains("Downloading webpage") {
-                                let _ = pengirim.send("INFO: Proses pengunduhan halaman dimulai.".to_string());
-                                println!("[Rust] Detected Downloading Webpage Line");
+        tokio::select! {
+            _ = async {
+                loop {
+                    tokio::select! {
+                        out = reader_out.next_line() => {
+                            match out {
+                                Ok(Some(line)) => {
+                                    println!("[stdout] {}", line);
+                                    if line.contains("Downloading webpage") {
+                                        let _ = pengirim.send("INFO: Proses pengunduhan halaman dimulai.".to_string());
+                                    }
+                                    if line.contains("Extracting") {
+                                        let _ = pengirim.send("INFO: Proses ekstraksi dimulai.".to_string());
+                                    }
+                                    if line.contains("Extracting audio") {
+                                        let _ = pengirim.send("INFO: Proses ekstraksi audio dimulai.".to_string());
+                                    }
+                                    if line.contains("download:") || line.contains('%') {
+                                        let _ = pengirim.send(line.clone());
+                                    }
+                                    if line.contains("Merging formats into"){
+                                        let _ = pengirim.send("INFO: Proses penggabungan format dimulai.".to_string());
+                                    }
+                                },
+                                Ok(None) => break,
+                                Err(e) => {
+                                    let _ = pengirim.send(format!("ERROR:Stdout error: {}", e));
+                                    break;
+                                }
                             }
-
-                            if line.contains("Extracting") {
-                                let _ = pengirim.send("INFO: Proses ekstraksi dimulai.".to_string());
-                                println!("[Rust] Detected Extracting Line");
+                        }
+                        err = reader_err.next_line() => {
+                            match err {
+                                Ok(Some(line)) => {
+                                    println!("[stderr] {}", line);
+                                    if line.to_lowercase().contains("error") {
+                                        let _ = pengirim.send(format!("ERROR:{}", line));
+                                    }
+                                },
+                                Ok(None) => break,
+                                Err(e) => {
+                                    let _ = pengirim.send(format!("ERROR:Stderr error: {}", e));
+                                    break;
+                                }
                             }
-
-                            if line.contains("Extracting audio") {
-                                let _ = pengirim.send("INFO: Proses ekstraksi audio dimulai.".to_string());
-                                println!("[Rust] Detected Extracting Audio Line");
-                            }
-
-                            if line.contains("download:") || line.contains('%') {
-                                let _ = pengirim.send(line.clone());
-                            }
-
-                            if line.contains("Merging formats into"){
-                                let _ = pengirim.send("INFO: Proses penggabungan format dimulai.".to_string());
-                                println!("[Rust] Detected Merge Finish Line");
-                            }
-                        },
-                        Ok(None) => break,
-                        Err(e) => {
-                            let _ = pengirim.send(format!("ERROR:Stdout error: {}", e));
-                            break;
                         }
                     }
                 }
-                err = reader_err.next_line() => {
-                    match err {
-                        Ok(Some(line)) => {
-                            println!("[stderr] {}", line);
-                            if line.to_lowercase().contains("error") {
-                                let _ = pengirim.send(format!("ERROR:{}", line));
-                            }
-                        },
-                        Ok(None) => break,
-                        Err(e) => {
-                            let _ = pengirim.send(format!("ERROR:Stderr error: {}", e));
-                            break;
-                        }
-                    }
+            } => {}
+
+            _ = &mut cancel_rx => {
+                let _ = pengirim.send("INFO: Proses pembatalan unduhan dimulai.".to_string());
+                println!("[Rust] Proses pembatalan unduhan dimulai.");
+
+                if let Err(e) = child.kill().await {
+                    let _ = pengirim.send(format!("ERROR:Gagal membatalkan unduhan: {}", e));
+                } else {
+                    let _ = pengirim.send("CANCELED: Unduhan dibatalkan user.".to_string());
                 }
             }
+        }
+
+        {
+            let mut pembatalan_map = status_aplikasi.pembatalan.lock().unwrap();
+            pembatalan_map.remove(&id_clone);
+            println!("[Rust] Proses pembatalan unduhan selesai.");
         }
 
         let status = child.wait().await;
@@ -465,6 +485,24 @@ async fn handle_unduhan(
     };
 
     (StatusCode::OK, axum::Json(respons_data)).into_response()
+}
+
+async fn cancel_download(
+    State(status_aplikasi): State<StatusAplikasi>,
+    _auth: Auth,
+    Query(param): Query<ParameterProgres>,
+) -> impl IntoResponse {
+    let mut map = status_aplikasi.pembatalan.lock().unwrap();
+    if let Some(cancel_tx) = map.remove(&param.id) {
+        let _ = cancel_tx.send(());
+        return (StatusCode::OK, "Proses pembatalan unduhan dimulai.").into_response();
+    } else {
+        return (
+            StatusCode::NOT_FOUND,
+            "ID unduhan tidak ditemukan atau sudah selesai.",
+        )
+            .into_response();
+    }
 }
 
 async fn ambil_download(

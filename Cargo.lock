@@ -3,6 +3,24 @@
 version = 4
 
 [[package]]
+name = "RusTube"
+version = "0.1.15"
+dependencies = [
+ "async-stream",
+ "axum",
+ "hyper",
+ "jsonwebtoken",
+ "mime_guess",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tower-http",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "addr2line"
 version = "0.24.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -575,24 +593,6 @@ dependencies = [
  "serde",
  "serde_json",
  "simple_asn1",
-]
-
-[[package]]
-name = "learn_rust"
-version = "0.1.0"
-dependencies = [
- "async-stream",
- "axum",
- "hyper",
- "jsonwebtoken",
- "mime_guess",
- "serde",
- "serde_json",
- "tokio",
- "tokio-util",
- "tower-http",
- "url",
- "uuid",
 ]
 
 [[package]]

@@ -1,7 +1,10 @@
 [package]
-name = "learn_rust"
-version = "0.1.0"
+name = "RusTube"
+authors = ["Inggrit Setya Budi"]
+description = "This is my rust learning practice project"
+version = "0.1.15"
 edition = "2024"
+repository = "https://github.com/cowoksoftpoken/Learning_Rust.git"
 
 [dependencies]
 axum = { version = "0.7", features = ["macros", "multipart"] } 
