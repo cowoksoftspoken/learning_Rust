@@ -19,5 +19,7 @@ mime_guess = "2.0"
 tokio-util = "0.7.15"
 url = "2.5.4"
 jsonwebtoken = "9.3.1"
+rand = "0.9.2"
+base64 = "0.22.1"
 
 

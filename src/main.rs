@@ -6,11 +6,13 @@ use axum::{
     body::Body,
     extract::{FromRef, Multipart, Path, Query, State},
     http::{StatusCode, header},
-    response::{Html, IntoResponse, Response},
+    response::{IntoResponse, Response},
     routing::{get, post},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD};
 use jsonwebtoken::{DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use mime_guess;
+use rand::RngCore;
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 use std::{
@@ -19,8 +21,9 @@ use std::{
     path::PathBuf,
     sync::{Arc, Mutex},
 };
+use tokio::fs;
 use tokio::{
-    fs::{self, File},
+    fs::File,
     io::{AsyncBufReadExt, BufReader},
     net::TcpListener,
     process::Command,
@@ -190,11 +193,27 @@ async fn main() {
 }
 
 async fn display_form() -> impl IntoResponse {
-    Html(
-        fs::read_to_string("static/index.html")
-            .await
-            .unwrap_or_else(|_| "Gagal memuat index.html".into()),
-    )
+    let mut buf = [0u8; 16];
+    rand::rng().fill_bytes(&mut buf);
+    let random_string = STANDARD.encode(&buf);
+    println!("Generated Nonce: {}", random_string);
+    let html_template = fs::read_to_string("static/index.html")
+        .await
+        .unwrap_or_else(|_| "Gagal memuat index.html".into());
+    println!("HTML Template Loaded");
+    println!("HTML Without Nonce: {}", html_template);
+    let csp = format!(
+        "script-src 'nonce-{}' https://cdn.tailwindcss.com; style-src 'unsafe-inline'",
+        random_string
+    );
+    println!("Content-Security-Policy: {}", csp);
+    let html = html_template.replace("{{NONCE}}", &random_string);
+    println!("HTML with Nonce: {}", html);
+    Response::builder()
+        .header("Content-Security-Policy", csp)
+        .header("Content-Type", "text/html")
+        .body(html)
+        .unwrap()
 }
 
 async fn refresh(axum::Json(payload): axum::Json<RefreshRequest>) -> impl IntoResponse {

@@ -95,7 +95,7 @@
       </form>
       <div class="mt-2 w-full flex">
         <button
-          class="w-full py-3 bg-gradient-to-r from-pink-600 to-red-600 hover:from-red-700 hover:to-pink-700 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all"
+          class="w-full py-3 bg-gradient-to-r from-pink-600 to-red-600 hover:from-red-700 hover:to-pink-700 text-white rounded-xl font-semibold shadow-md hover:shadow-lg transition-all hidden"
           id="cancel-button"
         >
           Cancel
@@ -106,11 +106,11 @@
         <h2 class="text-lg font-semibold mb-3 text-white/90">
           📺 Pratinjau Video:
         </h2>
-        <video
+        <!-- <video
           id="preview-video"
           class="w-full rounded-xl border border-white/20 shadow-lg"
           controls
-        ></video>
+        ></video> -->
       </div>
 
       <div
@@ -142,308 +142,13 @@
         </div>
       </div>
     </div>
-    <script>
-      const form = document.getElementById("download-form");
-      const progressText = document.getElementById("progress-text");
-      const progressFill = document.getElementById("progress-fill");
-      const downloadLinkContainer = document.getElementById(
-        "download-link-container"
-      );
-      const loginForm = document.getElementById("login-form");
-      const downloadLink = document.getElementById("download-link");
-      const videoPreview = document.getElementById("preview-video");
-      const previewContainer = document.getElementById("preview-container");
-      const progressContainer = document.getElementById("progress-container");
-      const cancelButton = document.getElementById("cancel-button");
 
-      let currentSource = null;
-      let retries = 0;
-      const maxRetries = 5;
-      let finished = false;
-      let currentDownloadId = null;
-      let token = localStorage.getItem("jwt_access") || "";
-
-      function formatDuration(duration) {
-        const minutes = Math.floor(duration / 60);
-        const seconds = duration % 60;
-        return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-      }
-
-      if (token) {
-        loginForm.classList.add("hidden");
-        form.classList.remove("hidden");
-      }
-
-      async function refreshAccessToken() {
-        const refreshToken = localStorage.getItem("jwt_refresh");
-        if (!refreshToken) {
-          alert("Session habis, silakan login ulang");
-          localStorage.clear();
-          location.reload();
-          return null;
-        }
-
-        const res = await fetch("/auth/refresh", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ refresh_token: refreshToken }),
-        });
-
-        if (!res.ok) {
-          alert("Gagal refresh token, silakan login ulang");
-          localStorage.clear();
-          location.reload();
-          return null;
-        }
-
-        const data = await res.json();
-        localStorage.setItem("jwt_access", data.access_token);
-        console.log("[JS] Token akses diperbarui:", data.access_token);
-        return data.access_token;
-      }
-
-      async function authFetch(url, options = {}) {
-        let accessToken = localStorage.getItem("jwt_access");
-        if (!options.headers) options.headers = {};
-        options.headers.Authorization = `Bearer ${accessToken}`;
-
-        let res = await fetch(url, options);
-
-        if (res.status === 401) {
-          accessToken = await refreshAccessToken();
-          if (!accessToken) return res;
-          options.headers.Authorization = `Bearer ${accessToken}`;
-          res = await fetch(url, options);
-        }
-
-        return res;
-      }
-
-      loginForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
-        const username = document.getElementById("username").value;
-
-        try {
-          const res = await fetch("/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ username }),
-          });
-
-          if (!res.ok) throw new Error("Login gagal!");
-
-          const data = await res.json();
-          localStorage.setItem("jwt_access", data.access_token);
-          localStorage.setItem("jwt_refresh", data.refresh_token);
-
-          alert("Login sukses! Token JWT disimpan.");
-          loginForm.classList.add("hidden");
-          form.classList.remove("hidden");
-        } catch (err) {
-          alert("Gagal login: " + err.message);
-        }
-      });
-
-      form.addEventListener("submit", async (e) => {
-        e.preventDefault();
-
-        // cek jika ada unduhan yang sedang berjalan
-        if (currentSource && !finished) {
-          alert("Masih ada unduhan yang sedang berjalan. Silakan tunggu.");
-          return;
-        }
-
-        progressContainer.classList.remove("hidden");
-        progressText.textContent = "🚀 Mulai download...";
-        progressFill.style.width = "0%";
-        progressFill.setAttribute("data-percent", "0%");
-        downloadLinkContainer.classList.add("hidden");
-        downloadLink.href = "#";
-        finished = false;
-
-        const url = document.getElementById("url").value;
-        const format = document.getElementById("format").value;
-
-        const formData = new FormData();
-        formData.append("url", url);
-        formData.append("format", format);
-
-        if (currentSource) {
-          currentSource.close();
-          currentSource = null;
-        }
-
-        try {
-          const response = await authFetch("/download", {
-            method: "POST",
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            const errorMsg =
-              errorData.status || "Terjadi kesalahan tidak diketahui.";
-            progressText.textContent = `Gagal mulai: ${errorMsg}`;
-            return;
-          }
-
-          const data = await response.json();
-          const downloadId = data.id;
-          retries = 0;
-          currentDownloadId = downloadId;
-          console.log("[JS] ID Unduhan:", downloadId);
-
-          connectEventSource(downloadId);
-        } catch (error) {
-          console.error("[JS] Jaringan error:", error);
-          progressText.textContent = `Jaringan error: ${error.message}`;
-        }
-      });
-
-      cancelButton.addEventListener("click", async () => {
-        if (!currentDownloadId) {
-          alert("Tidak ada unduhan yang sedang berjalan.");
-          return;
-        }
-
-        try {
-          await cancel_download(currentDownloadId);
-          if (currentSource) {
-            currentSource.close();
-            currentSource = null;
-          }
-          progressText.textContent = "Pembatalan unduhan berhasil.";
-          progressFill.style.width = "0%";
-          progressFill.setAttribute("data-percent", "0%");
-          downloadLinkContainer.classList.add("hidden");
-          previewContainer.classList.add("hidden");
-        } catch (error) {
-          console.error("[JS] Gagal membatalkan unduhan:", error);
-          alert(`Gagal membatalkan unduhan: ${error.message}`);
-        }
-      });
-
-      function connectEventSource(downloadId) {
-        if (currentSource) {
-          currentSource.close();
-        }
-
-        currentSource = new EventSource(`/progress?id=${downloadId}`);
-        console.log(`[JS] Opening EventSource untuk ID: ${downloadId}`);
-
-        currentSource.onmessage = (event) => {
-          const msg = event.data.trim();
-          console.log("[JS] onmessage:", msg);
-
-          if (msg.startsWith("ERROR:")) {
-            finished = true;
-            currentSource.close();
-            progressText.textContent = `${msg.replace("ERROR:", "")}`;
-            return;
-          }
-
-          if (msg.startsWith("INFO:")) {
-            progressText.textContent = `🔧 ${msg.replace("INFO:", "")}`;
-            return;
-          }
-
-          const match = msg.match(/(\d+\.\d+)%|(\d+)%/);
-          if (match) {
-            const percent = parseFloat(match[1] || match[2]);
-            progressFill.style.width = `${percent}%`;
-            progressFill.setAttribute("data-percent", `${percent.toFixed(0)}%`);
-            progressText.textContent = `⏳ Downloading... ${percent.toFixed(
-              1
-            )}%`;
-          }
-        };
-
-        currentSource.addEventListener("complete", (event) => {
-          finished = true;
-          currentSource.close();
-
-          const filename = event.data.trim();
-          progressText.textContent = `Selesai: ${filename}`;
-          progressFill.style.width = "100%";
-          progressFill.setAttribute("data-percent", "100%");
-          setDownloadLink(downloadId, filename);
-          previewContainer.classList.remove("hidden");
-          downloadLink.textContent = `Unduh ${filename} (600s)`;
-          downloadLinkContainer.classList.remove("hidden");
-
-          let remaining = 600;
-          const timer = setInterval(() => {
-            remaining--;
-            downloadLink.textContent = `Unduh ${filename} (${formatDuration(
-              remaining
-            )})`;
-            if (remaining <= 0) {
-              clearInterval(timer);
-              downloadLink.href = "#";
-              downloadLink.textContent = `⛔ Link Expired`;
-              downloadLink.classList.add("opacity-50", "cursor-not-allowed");
-              downloadLink.classList.remove("hover:bg-green-700");
-              progressText.textContent =
-                "Link download sudah kedaluwarsa. Silakan ulangi.";
-              console.warn("[Warn] Link expired, tidak bisa diunduh lagi.");
-            }
-          }, 1000);
-        });
-
-        currentSource.onerror = () => {
-          if (finished) {
-            console.log(
-              "[JS] EventSource error tapi udah selesai. Stop reconnect."
-            );
-            return;
-          }
-
-          currentSource.close();
-
-          if (retries < maxRetries) {
-            retries++;
-            progressText.textContent = `Koneksi terputus... mencoba ulang (${retries}/${maxRetries})`;
-            setTimeout(() => connectEventSource(downloadId), 2000);
-          } else {
-            progressText.textContent = "Gagal menyambung ulang ke server.";
-          }
-        };
-      }
-
-      async function cancel_download(downloadId) {
-        const response = await authFetch(`/cancel_download?id=${downloadId}`, {
-          method: "POST",
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const errorMsg =
-            errorData.status || "Terjadi kesalahan tidak diketahui.";
-          alert(`Gagal membatalkan unduhan: ${errorMsg}`);
-          return;
-        }
-
-        console.log(
-          "[JS] Pembatalan unduhan berhasil." + (downloadId, response.text())
-        );
-        progressText.textContent = "Pembatalan unduhan berhasil.";
-      }
-
-      async function setDownloadLink(downloadId, filename) {
-        const fileUrl = `/ambil_download/${downloadId}/${filename}`;
-        const res = await authFetch(fileUrl);
-
-        if (!res.ok) {
-          throw new Error("Gagal ambil file");
-        }
-
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-
-        videoPreview.src = blobUrl;
-        downloadLink.href = blobUrl;
-        downloadLink.download = `RustTube_${filename}`;
-      }
-    </script>
+    <script
+      src="/static/js/script.js"
+      data-nonce="{{NONCE}}"
+      defer
+      crossorigin="anonymous"
+      nonce="{{NONCE}}"
+    ></script>
   </body>
 </html>
