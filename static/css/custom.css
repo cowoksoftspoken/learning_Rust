@@ -1,0 +1,29 @@
+body {
+  font-family: "Inter", sans-serif;
+}
+
+.dark body {
+  background: #1a202c;
+  color: #e2e8f0;
+}
+
+#progress-fill::after {
+  content: attr(data-percent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: white;
+  font-weight: bold;
+  font-size: 0.9em;
+}
+.hero-bg {
+  min-height: 100vh;
+  background-image: url("/static/background/under_sea.avif") !important;
+}
+.hero-bg {
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}

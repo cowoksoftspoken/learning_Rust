@@ -203,8 +203,8 @@ async fn display_form() -> impl IntoResponse {
     println!("HTML Template Loaded");
     println!("HTML Without Nonce: {}", html_template);
     let csp = format!(
-        "script-src 'nonce-{}' https://cdn.tailwindcss.com; style-src 'unsafe-inline'",
-        random_string
+        "script-src 'nonce-{}' 'strict-dynamic' https://cdn.tailwindcss.com; style-src 'unsafe-inline' 'self' https://cdn.tailwindcss.com; default-src 'self'; media-src 'self' blob:;",
+        &random_string
     );
     println!("Content-Security-Policy: {}", csp);
     let html = html_template.replace("{{NONCE}}", &random_string);
@@ -212,6 +212,8 @@ async fn display_form() -> impl IntoResponse {
     Response::builder()
         .header("Content-Security-Policy", csp)
         .header("Content-Type", "text/html")
+        .header("Cache-Control", "no-cache, no-store, must-revalidate")
+        .header("Pragma", "no-cache")
         .body(html)
         .unwrap()
 }

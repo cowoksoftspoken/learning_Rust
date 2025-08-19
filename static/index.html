@@ -5,39 +5,20 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>RustTube</title>
     <link rel="preload" as="image" href="/static/logo/RustTube_logo.png" />
-    <link rel="preload" as="image" href="/static/background/sea.avif" />
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-      body {
-        font-family: "Inter", sans-serif;
-      }
-
-      .dark body {
-        background: #1a202c;
-        color: #e2e8f0;
-      }
-
-      #progress-fill::after {
-        content: attr(data-percent);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 100%;
-        height: 100%;
-        color: white;
-        font-weight: bold;
-        font-size: 0.9em;
-      }
-      .hero-bg {
-        min-height: 100vh;
-        background-image: url("/static/background/under_sea.avif") !important;
-      }
-      .hero-bg {
-        background-size: cover;
-        background-position: center;
-        background-repeat: no-repeat;
-      }
-    </style>
+    <script
+      nonce="{{NONCE}}"
+      data-nonce="{{NONCE}}"
+      integrity="sha384-igm5BeiBt36UU4gqwWS7imYmelpTsZlQ45FZf+XBn9MuJbn4nQr7yx1yFydocC/K"
+      src="/static/js/tailwind.js"
+      crossorigin="anonymous"
+    ></script>
+    <link
+      rel="stylesheet"
+      href="/static/css/custom.css"
+      nonce="{{NONCE}}"
+      data-nonce="{{NONCE}}"
+      crossorigin="anonymous"
+    />
     <link rel="shortcut icon" href="/static/logo/RustTube_logo.png" />
   </head>
 
@@ -147,6 +128,7 @@
       src="/static/js/script.js"
       data-nonce="{{NONCE}}"
       defer
+      integrity="sha384-hbp5c49/+cig2taB4GKOwggdZsPO3gP2m/7J6SghJAqv8/RJUbaktljVUbHJxfTL"
       crossorigin="anonymous"
       nonce="{{NONCE}}"
     ></script>
